@@ -1,4 +1,4 @@
-import mongoose, {isValidObjectId} from "mongoose";
+import mongoose, { isValidObjectId } from "mongoose";
 import {Video} from "../models/video.model.js";
 import {User} from "../models/user.model.js";
 import {ApiError} from "../utilis/ApiError.js"
@@ -17,7 +17,7 @@ const getAllVideos = asyncHandler(async(req, res) => {
     const sortOrder = sortType === "asc" ? 1 : -1 ;
     const mongoQuery = {} ;
 
-    if(userId && !isValidObjectId(userId)){
+    if(userId && ! mongoose.isValidObjectId(userId)){
         throw new ApiError(400,"Invalid userId")
     }
     
@@ -25,7 +25,7 @@ const getAllVideos = asyncHandler(async(req, res) => {
         mongoQuery.title = { $regex : query, $options : "i"}
     };
     if(userId){
-        mongoQuery.owner = userId
+        mongoQuery.owner = new mongoose.Types.ObjectId(userId)
     }
     
     const videos = await Video.aggregate([
@@ -151,7 +151,7 @@ const getVideoById = asyncHandler(async(req, res) => {
     const {videoId} = req.params
     //Todo: get video by id
 
-    if (!mongoose.Types.ObjectId.isValid(videoId)) {
+    if (!mongoose.isValidObjectId(videoId)) {
     throw new ApiError(400, "Invalid video ID format")
     }
 
@@ -208,7 +208,7 @@ const updateVideo = asyncHandler(async(req, res) => {
     const { title , description } = req.body
     //Todo: update video details like title, description, thumbnail
 
-     if (!mongoose.Types.ObjectId.isValid(videoId)) {
+     if (!mongoose.isValidObjectId(videoId)) {
     throw new ApiError(404, "Invalid video ID format")
     }
 

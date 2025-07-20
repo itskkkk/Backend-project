@@ -1,4 +1,4 @@
-import mongoose, {isValidObjectId} from "mongoose";
+import mongoose, { isValidObjectId } from "mongoose";
 import {Tweet} from "../models/tweet.model.js";
 import {User} from "../models/user.model.js";
 import {ApiError} from "../utilis/ApiError.js"
@@ -86,7 +86,7 @@ const updateTweet = asyncHandler(async(req, res) => {
     const {content} = req.body
     const {tweetId} = req.params
 
-    if(!mongoose.Types.ObjectId.isValid(tweetId)){
+    if(!mongoose.isValidObjectId(tweetId)){
         throw new ApiError ( 400,"invalid tweetId")
     }
 
@@ -120,7 +120,7 @@ const deleteTweet = asyncHandler(async(req, res) => {
 
     const { tweetId } = req.params
     
-    if(!tweetId || !mongoose.Types.ObjectId.isValid(tweetId)){
+    if(!tweetId || !mongoose.isValidObjectId(tweetId)){
         throw new ApiError(400,"valid tweetId is required")
     }
 

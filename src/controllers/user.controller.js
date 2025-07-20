@@ -41,11 +41,11 @@ const registerUser = asyncHandler(async (req , res) => {
     //console.log(req.files);
 
     const avatarLocalpath = req.files?.avatar[0]?.path;
-    //const coverImageLocalpath = req.files?.coverImage[0]?.path;
+    // const coverImageLocalpath = req.files?.coverImage[0]?.path;
 
     let coverImageLocalpath;
     if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0 ) {
-          coverImageLocalpath = req.files.coverImage[0].path
+       coverImageLocalpath = req.files.coverImage[0].path;
     }
 
     if (!avatarLocalpath) {
@@ -120,7 +120,7 @@ const loginUser = asyncHandler(async (req, res) => {
         throw new ApiError(400,"User does not exist")
     }
 
-    const isPasswordValid = await User.isPasswordCorrect(password)
+    const isPasswordValid = await user.isPasswordCorrect(password)
 
     if(!isPasswordValid){
         throw new ApiError(400,"Invalid credentials")
@@ -128,7 +128,7 @@ const loginUser = asyncHandler(async (req, res) => {
 
     const {accessToken , refreshToken } = await generateAccessAndRefreshTokens(user._id)
 
-    const loggedInUser = User.findById(user_id).select("-password -refreshToken")
+    const loggedInUser = await User.findById(user_id).select("-password -refreshToken")
 
     const options = {
         httpOnly: true,
@@ -186,7 +186,7 @@ const refreshAccessToken = asyncHandler (async (req, res) => {
             process.env.REFRESH_TOKEN_SECRET
         )
     
-        const user = await User.findByIdI(decodedToken?._id)
+        const user = await User.findById(decodedToken?._id)
     
         if(!user){
             throw new ApiError(401,"Invalid RefreshToken")
@@ -343,7 +343,7 @@ const getUserChannelProfile = asyncHandler(async(req, res) => {
         },
         {
             $lookup: {
-                  from: "subscriptions",
+                from: "subscriptions",
                 localField: "_id",
                 foreignField: "subscriber",
                 as: "subscribedTo"
@@ -439,7 +439,7 @@ const getWatchHistory = asyncHandler(async(req, res) => {
               .json(
                 new ApiResponse(
                     200,
-                    user[0].WatchHistory,
+                    user[0].watchHistory,
                     "watch history fetched successfully"
                 )
               )
