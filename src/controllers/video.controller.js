@@ -261,8 +261,8 @@ const updateVideo = asyncHandler(async(req, res) => {
 
     await video.save({validateBeforeSave : false});
 
-    if (previousVideo) deleteOnCloudinary(previousVideo);
-    if (previousThumbnail) deleteOnCloudinary(previousThumbnail);
+    if (previousVideo) await deleteOnCloudinary(previousVideo);
+    if (previousThumbnail) await deleteOnCloudinary(previousThumbnail);
 
 
     return res.status(200)
@@ -297,8 +297,8 @@ const deleteVideo = asyncHandler(async(req, res) => {
     }
 
     await Video.findByIdAndDelete(videoId)
-    deleteOnCloudinary(videoFile);
-    deleteOnCloudinary(thumbnail) ;
+    await deleteOnCloudinary(videoFile);
+    await deleteOnCloudinary(thumbnail) ;
 
     return res.status(200)
               .json(

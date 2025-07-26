@@ -1,7 +1,7 @@
 import { asyncHandler } from "../utilis/asyncHandler.js";
 import {ApiError} from "../utilis/ApiError.js";
 import { User } from "../models/user.model.js";
-import {uploadOnCloudinary} from "../utilis/cloudinary.js";
+import {uploadOnCloudinary, deleteOnCloudinary} from "../utilis/cloudinary.js";
 import { ApiResponse } from "../utilis/ApiResponse.js";
 import jwt  from "jsonwebtoken";
 import mongoose from "mongoose";
@@ -56,12 +56,15 @@ const registerUser = asyncHandler(async (req , res) => {
     const coverImage = await uploadOnCloudinary(coverImageLocalpath)
 
     if (!avatar) { 
-        throw new ApiError(400, "Avatar files is required")
+        throw new ApiError(400, "Avatar  files is required")
     }
 
     const user = await User.create({
         fullName,
-        avatar: avatar.url,
+        avatar: {
+             url : avatar?.url,
+             public_id : avatar?.public_id
+        },
         coverImage: coverImage?.url || "",
         email, 
         password,
@@ -76,7 +79,7 @@ const registerUser = asyncHandler(async (req , res) => {
         throw new ApiError(500 , "something went wrong while registering the user")
     }
 
-    return res.status(201).json(
+    return res.status(200).json(
         new ApiResponse(200, createdUser, "User Registered successfully")
     )
 
@@ -269,6 +272,14 @@ const updateUserAvatar = asyncHandler(async(req, res) => {
         throw new ApiError(400, "Avatar file is missing")
     }
 
+    const findUser = await User.findById(req.user?._id)
+
+    if(!findUser){
+        throw new ApiError(404, "User not found")
+    }
+
+    const previousAvatar = findUser.avatar.public_id 
+
     const avatar = await uploadOnCloudinary(avatarLocalpath)
 
     if(!avatar.url) {
@@ -278,11 +289,16 @@ const updateUserAvatar = asyncHandler(async(req, res) => {
         req.user?._id,
         {
             $set: {
-                avatar: avatar.url
+                avatar: {
+                    url : avatar.url,
+                    public_id  : avatar.public_id
+                }
             }
         },
         {new: true}
     ).select("-password")
+
+    if(previousAvatar) await deleteOnCloudinary(previousAvatar)
 
     // ToDo: delete old image - assignment
 
