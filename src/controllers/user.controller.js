@@ -40,8 +40,13 @@ const registerUser = asyncHandler(async (req , res) => {
     }
     //console.log(req.files);
 
-    const avatarLocalpath = req.files?.avatar[0]?.path;
+    //const avatarLocalpath = req.files?.avatar[0]?.path;
     // const coverImageLocalpath = req.files?.coverImage[0]?.path;
+
+    let avatarLocalpath;
+    if (req.files && Array.isArray(req.files.avatar) && req.files.avatar.length > 0 ) {
+       avatarLocalpath = req.files.avatar[0].path;
+    }
 
     let coverImageLocalpath;
     if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0 ) {
@@ -61,10 +66,7 @@ const registerUser = asyncHandler(async (req , res) => {
 
     const user = await User.create({
         fullName,
-        avatar: {
-             url : avatar?.url,
-             public_id : avatar?.public_id
-        },
+        avatar: avatar.url,
         coverImage: coverImage?.url || "",
         email, 
         password,
@@ -131,7 +133,7 @@ const loginUser = asyncHandler(async (req, res) => {
 
     const {accessToken , refreshToken } = await generateAccessAndRefreshTokens(user._id)
 
-    const loggedInUser = await User.findById(user_id).select("-password -refreshToken")
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
 
     const options = {
         httpOnly: true,
@@ -278,7 +280,7 @@ const updateUserAvatar = asyncHandler(async(req, res) => {
         throw new ApiError(404, "User not found")
     }
 
-    const previousAvatar = findUser.avatar.public_id 
+    const previousAvatar = findUser.avatar
 
     const avatar = await uploadOnCloudinary(avatarLocalpath)
 
@@ -289,10 +291,7 @@ const updateUserAvatar = asyncHandler(async(req, res) => {
         req.user?._id,
         {
             $set: {
-                avatar: {
-                    url : avatar.url,
-                    public_id  : avatar.public_id
-                }
+                avatar: avatar.url
             }
         },
         {new: true}

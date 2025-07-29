@@ -120,12 +120,8 @@ const publishAVideo = asyncHandler(async(req, res) => {
     const video = await Video.create({
         title,
         description,
-        videoFile :  { url : videoFile?.url,
-                       public_id : videoFile?.public_id
-        },
-        thumbnail :   { url : thumbnail?.url,
-                       public_id : thumbnail?.public_id
-        },
+        videoFile :   videoFile.url,
+        thumbnail :   thumbnail.url,
         isPublished : true,
         owner : req.user._id,
         duration : videoFile.duration  || 0 ,
@@ -218,8 +214,8 @@ const updateVideo = asyncHandler(async(req, res) => {
         throw new ApiError(403,"you are not authorized to update the video")
     }
 
-    const previousVideo = video.videoFile.public_id
-    const previousThumbnail = video.thumbnail.public_id
+    const previousVideo = video.videoFile
+    const previousThumbnail = video.thumbnail
 
     const videoLocalPath = req.files?.videoFile[0]?.path
     const thumbnailLocalPath = req.files?.thumbnail[0]?.path
@@ -241,15 +237,8 @@ const updateVideo = asyncHandler(async(req, res) => {
         throw new ApiError(500, "something went wrong while uploading photo")
     }
 
-    video.videoFile = {
-        url : videoFile.url,
-        public_id : videoFile.public_id
-    }
-
-    video.thumbnail = {
-        url : thumbnail.url,
-        public_id : thumbnail.public_id
-    }
+    video.videoFile =  videoFile.url
+    video.thumbnail =  thumbnail.url
 
     if(title?.trim()){
         video.title = title.trim()
@@ -289,8 +278,8 @@ const deleteVideo = asyncHandler(async(req, res) => {
     if(!video){
         throw new ApiError(400,"video is not found")
     }
-    const videoFile = video.videoFile?.public_id
-    const thumbnail = video.thumbnail?.public_id
+    const videoFile = video.videoFile
+    const thumbnail = video.thumbnail
 
     if(video.owner.toString() !== req.user._id.toString()){
         throw new ApiError(400,"user is not authenticated to delete")  

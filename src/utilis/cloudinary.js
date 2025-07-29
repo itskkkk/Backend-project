@@ -14,7 +14,8 @@ const uploadOnCloudinary = async (localFilePath) => {
         if(!localFilePath) return null
         // upload the file on cloudinary
        const response = await cloudinary.uploader.upload(localFilePath, {
-            resource_type: "auto"
+            resource_type: "auto",
+            folder : "youtube/files"
         })
         // file has been uploaded successfully
         // console.log("file is uploaded on cloudinary", response.url);
@@ -26,18 +27,35 @@ const uploadOnCloudinary = async (localFilePath) => {
     }
 } 
 
-const deleteOnCloudinary = async(path) => {
+const deleteOnCloudinary = async (url) => {
     try {
-        if(!path) return null ;
+        if (!url)  return null;
 
-        const response = await cloudinary.uploader.destroy(path)
+        // Match common Cloudinary URL pattern
+        const match =  url.match(/\/upload\/(?:v\d+\/)?(.+?)\.\w+$/);
 
-        return response ;
+        if (!match || !match[1]) {
+            console.log("Invalid Cloudinary URL structure.");
+            return null;
+        }
+
+        const publicId = match[1]; // e.g., "youtube/files/xyz123"
+
+        // Determine if it's a video or image based on URL extension
+        const isVideo = /\.(mp4|mov|webm|avi|mkv)$/.test(url);
+
+        const response = await cloudinary.uploader.destroy(publicId, {
+            resource_type: isVideo ? "video" : "image",
+        });
+
+        return response;
+
     } catch (error) {
-        console.log("cloudinary delete error:", error.message)
+        console.log("Cloudinary delete error:", error.message);
         return null;
     }
-}
+};
+
 
 
 export {uploadOnCloudinary, deleteOnCloudinary} ;    
