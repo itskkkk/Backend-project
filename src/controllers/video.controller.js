@@ -7,7 +7,49 @@ import {asyncHandler}  from "../utilis/asyncHandler.js";
 import {uploadOnCloudinary,deleteOnCloudinary} from "../utilis/cloudinary.js";
 
 
-const getAllVideos = asyncHandler(async(req, res) => {
+const getAllVideos  = asyncHandler(async(req, res) => {
+    const { userId } = req.query;
+
+    if(userId && !isValidObjectId(userId)){
+        throw new ApiError(400,"Invalid userId")
+    }
+    const matchStage = { isPublished: true }
+    if(userId) {
+        matchStage.owner = new mongoose.Types.ObjectId(userId)
+    }
+
+    const videos = await Video.aggregate([
+        {
+            $match : matchStage
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner",
+                pipeline: [
+                    {
+                        $project : {
+                            username: 1,
+                            fullName: 1,
+                            avatar: 1,
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            $unwind: "$owner",
+        }
+    ]);
+
+    return res.status(200)
+              .json(new ApiResponse(200,videos, "video fetched successfully"))
+
+});
+
+const getAllVideosByOption = asyncHandler(async(req, res) => {
     const { page = 1, limit = 10, query, sortBy = "createdAt", sortType = "desc", userId } = req.query
     //Todo: get all videos based on query,sort, pagination
 
@@ -319,4 +361,6 @@ const togglePublishStatus = asyncHandler(async(req, res) => {
 })
 
 
-export { getAllVideos,publishAVideo,getVideoById,updateVideo,deleteVideo,togglePublishStatus}
+
+
+export { getAllVideos,getAllVideosByOption,publishAVideo,getVideoById,updateVideo,deleteVideo,togglePublishStatus}
