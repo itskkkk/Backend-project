@@ -79,9 +79,9 @@ const getChannelVideos = asyncHandler(async(req , res) => {
         }
     ])
 
-    if(!allVideos  || allVideos.length === 0){
-        throw new ApiError(404,"videos not found")
-    }
+    // if(!allVideos  || allVideos.length === 0){
+    //     throw new ApiError(404,"videos not found")
+    // }
 
     return res.status(200)
               .json(new ApiResponse(200,allVideos,"All videos fetched successfully"))
