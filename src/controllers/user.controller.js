@@ -246,10 +246,10 @@ const getCurrentUser = asyncHandler(async(req, res) => {
 })
 
 const updateAccountDetails = asyncHandler(async(req, res) => {
-    const { fullName, email} = req.body
+    const { fullName, email, username, description } = req.body
 
-    if(!fullName || !email) {
-        throw new ApiError(400,"All fields are required")
+    if(!fullName && !email && !username && !description) {
+        throw new ApiError(400,"At least one field required")
     }
 
     const user = await User.findByIdAndUpdate(
@@ -257,7 +257,9 @@ const updateAccountDetails = asyncHandler(async(req, res) => {
         {
             $set:{
                 fullName,
-                email: email
+                email: email,
+                username,
+                description
             }
         },
         {new: true}
@@ -396,9 +398,9 @@ const getUserChannelProfile = asyncHandler(async(req, res) => {
         }
     ])
 
-    if(!channel?.length) {
-        throw new ApiError(404, "channel does not exist")
-    }
+    // if(!channel?.length) {
+    //     throw new ApiError(404, "channel does not exist")
+    // }
 
     return res.status(200)
               .json(
@@ -460,6 +462,115 @@ const getWatchHistory = asyncHandler(async(req, res) => {
               )
 })
 
+const clearWatchHistory = asyncHandler(async(req, res) => {
+    const isCleared = await User.findByIdAndUpdate(
+        new mongoose.Types.ObjectId(req.user?._id),
+        {
+            $set: {
+                watchHistory: [],
+            },
+        },
+        {
+            new: true,
+        }
+    );
+
+    if (!isCleared) throw new ApiError(500, "Failed to clear history");
+    return res.status(200)
+              .json(new ApiResponse(200, [], "History Cleared Successfully"));
+});
+
+const getAboutChannel = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  if (!isValidObjectId(userId)) throw new ApiError(400, "Invalid userId");
+
+  const aboutChannel = await User.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(userId),
+      },
+    },
+    // fetch total videos and views
+    {
+      $lookup: {
+        from: "videos",
+        localField: "_id",
+        foreignField: "owner",
+        as: "videos",
+        pipeline: [
+          // THINKME: what to do
+          {
+            $match: {
+              isPublished: true,
+            },
+          },
+          {
+            $group: {
+              _id: "owner",
+              totalVideos: { $count: {} },
+              totalViews: { $sum: "$views" },
+            },
+          },
+        ],
+      },
+    },
+    {
+      $lookup: {
+        from: "tweets",
+        localField: "_id",
+        foreignField: "owner",
+        as: "tweets",
+        pipeline: [
+          {
+            $group: {
+              _id: "owner",
+              totalTweets: { $count: {} },
+            },
+          },
+        ],
+      },
+    },
+    {
+      $project: {
+        username: 1,
+        fullName: 1,
+        email: 1,
+        totalVideos: {
+          $cond: {
+            if: { $gt: [{ $size: "$videos" }, 0] },
+            then: { $first: "$videos.totalVideos" },
+            else: 0,
+          },
+        },
+        totalViews: {
+          $cond: {
+            if: { $gt: [{ $size: "$videos" }, 0] },
+            then: { $first: "$videos.totalViews" },
+            else: 0,
+          },
+        },
+        totalTweets: {
+          $cond: {
+            if: { $gt: [{ $size: "$tweets" }, 0] },
+            then: { $first: "$tweets.totalTweets" },
+            else: 0,
+          },
+        },
+        createdAt: 1,
+        description: 1,
+      },
+    },
+  ]);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, aboutChannel[0], "channel details sent successfully")
+    );
+});
+
+
 export { registerUser, 
          loginUser,  
          logoutUser,
@@ -470,5 +581,7 @@ export { registerUser,
         updateUserAvatar,
         updateUserCoverImage,
         getUserChannelProfile,
-        getWatchHistory
+        getWatchHistory,
+        clearWatchHistory,
+        getAboutChannel,
      }
