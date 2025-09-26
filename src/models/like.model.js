@@ -16,7 +16,11 @@ const likeSchema = new Schema({
     likedBy: {
         type: Schema.Types.ObjectId,
         ref: "User"
-    }
+    },
+    liked: {
+        type: Boolean,
+        default: true,
+    },
 }, { timestamps: true})
 
 export const Like = mongoose.model("Like",likeSchema)

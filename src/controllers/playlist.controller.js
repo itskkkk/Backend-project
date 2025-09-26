@@ -9,8 +9,8 @@ const createPlaylist = asyncHandler(async(req, res) => {
     const {name, description} = req.body
     //Todo: create playlist
 
-    if(!name || !description){
-        throw new ApiError(400,"All fields are required")
+    if(!name){
+        throw new ApiError(400,"Name is required")
     }
 
     const playlist = await Playlist.create({
