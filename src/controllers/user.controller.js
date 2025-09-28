@@ -481,14 +481,16 @@ const clearWatchHistory = asyncHandler(async(req, res) => {
 });
 
 const getAboutChannel = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
+  const { username } = req.params;
 
-  if (!isValidObjectId(userId)) throw new ApiError(400, "Invalid userId");
+  if(!username?.trim()) {
+    throw new ApiError(400, "Username is required");
+  }
 
   const aboutChannel = await User.aggregate([
     {
       $match: {
-        _id: new mongoose.Types.ObjectId(userId),
+        username: username.toLowerCase()
       },
     },
     // fetch total videos and views
