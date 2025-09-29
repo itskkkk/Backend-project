@@ -36,94 +36,172 @@ const toggleSubscription = asyncHandler(async(req, res) => {
 })
 
 //controller to return subscriber list of a channel
-const getUserChannelSubscribers = asyncHandler(async(req, res) => {
-    const {channelId} = req.params
+const getUserChannelSubscribers = asyncHandler(async (req, res) => {
+  const { channelId = req.user?._id } = req.params;
 
-    if(!channelId || !isValidObjectId(channelId)){
-        throw new ApiError(400, "channelId is not valid")
-    }
+  if (!isValidObjectId(channelId)) throw new ApiError(400, "Invalid ChannelId");
 
-    const subscribers = await Subscription.aggregate([
-        {
-            $match : {
-                channel : new mongoose.Types.ObjectId(channelId)
-            }
+  const subscriberList = await Subscription.aggregate([
+    {
+      $match: {
+        channel: new mongoose.Types.ObjectId(channelId),
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "channel",
+        foreignField: "subscriber",
+        as: "subscribedChannels",
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "subscriber",
+        foreignField: "_id",
+        as: "subscriber",
+        pipeline: [
+          {
+            $lookup: {
+              from: "subscriptions",
+              localField: "_id",
+              foreignField: "channel",
+              as: "subscribersSubscribers",
+            },
+          },
+          {
+            $project: {
+              username: 1,
+              avatar: 1,
+              fullName: 1,
+              subscribersCount: {
+                $size: "$subscribersSubscribers",
+              },
+            },
+          },
+        ],
+      },
+    },
+    {
+      $unwind: {
+        path: "$subscriber",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      $addFields: {
+        "subscriber.isSubscribed": {
+          $cond: {
+            if: {
+              $in: ["$subscriber._id", "$subscribedChannels.channel"],
+            },
+            then: true,
+            else: false,
+          },
         },
-        {
-            $lookup : {
-                from : "users",
-                localField : "subscriber",
-                foreignField : "_id",
-                as : "subscribers",
-                pipeline : [
-                    {
-                        $project : {
-                            username : 1,
-                            fullName : 1,
-                            avatar : 1,
-                        }
-                    }
-                ]
-            }
+      },
+    },
+    {
+      $group: {
+        _id: "channel",
+        subscriber: {
+          $push: "$subscriber",
         },
-        {
-            $unwind : "$subscribers"
-        }
-    ])
+      },
+    },
+  ]);
 
-    if(!subscribers || subscribers.length  === 0) {
-        throw new ApiError(400, "NO subscribers found")
-    }
+  const subscribers =
+    subscriberList?.length > 0 ? subscriberList[0].subscriber : [];
 
-    return res.status(200)
-              .json(new ApiResponse(200,subscribers,"subscribers updated successfully"))
+  return res
+    .status(200)
+    .json(new ApiResponse(200, subscribers, "Subscriber Sent Successfully"));
+});
 
-})
+// controller to return channel list to which user has subscribed
+const getSubscribedChannels = asyncHandler(async (req, res) => {
+  const { subscriberId } = req.params;
 
-//controller to return channel list to which user has subscribed
-const getSubscribedChannels = asyncHandler(async(req, res) => {
-    const {subscriberId} = req.params
+  if (!isValidObjectId(subscriberId))
+    throw new ApiError(400, "Invalid subscriberId");
 
-    if(!subscriberId || !isValidObjectId(subscriberId)){
-        throw new ApiError(400,"Invalid subscriberId")
-    }
-
-    const subscribedChannels = await Subscription.aggregate([
-        {
-            $match : {
-                subscriber : new mongoose.Types.ObjectId(subscriberId)
-            }
+  const subscribedChannels = await Subscription.aggregate([
+    // get all subscribed channels
+    {
+      $match: {
+        subscriber: new mongoose.Types.ObjectId(subscriberId),
+      },
+    },
+    // get channel details
+    {
+      $lookup: {
+        from: "users",
+        localField: "channel",
+        foreignField: "_id",
+        as: "channel",
+        pipeline: [
+          {
+            $project: {
+              fullName: 1,
+              username: 1,
+              avatar: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $unwind: "$channel",
+    },
+    // get channel's subscribers
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "channel._id",
+        foreignField: "channel",
+        as: "channelSubscribers",
+      },
+    },
+    {
+      // logic if current user has subscribed the channel or not
+      $addFields: {
+        "channel.isSubscribed": {
+          $cond: {
+            if: { $in: [req.user?._id, "$channelSubscribers.subscriber"] },
+            then: true,
+            else: false,
+          },
         },
-        {
-            $lookup : {
-                from : "users",
-                localField : "channel",
-                foreignField : "_id",
-                as : "channels",
-                pipeline : [
-                    {
-                        $project : {
-                            username : 1,
-                            fullName : 1,
-                            avatar : 1,
-                        }
-                    }
-                ]
-            }
+        // channel subscriber count
+        "channel.subscribersCount": {
+          $size: "$channelSubscribers",
         },
-        {
-            $unwind : "$channels"
-        }
-    ])
+      },
+    },
+    {
+      $group: {
+        _id: "subscriber",
+        subscribedChannels: {
+          $push: "$channel",
+        },
+      },
+    },
+  ]);
 
-    if(!subscribedChannels || subscribedChannels.length === 0 ){
-        throw new ApiError (404, "No subscribedChannels found")
-    }
+  const users =
+    subscribedChannels?.length > 0
+      ? subscribedChannels[0].subscribedChannels
+      : [];
 
-    return res.status(200)
-              .json(new ApiResponse(200,subscribedChannels,"subscribed channels fetched successfully"))
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, users, "Subscribed channel list sent successfully")
+    );
+});
 
-})
 
 export {
     toggleSubscription,
