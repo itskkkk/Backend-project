@@ -175,13 +175,13 @@ const getUserTweets = asyncHandler(async (req, res) => {
 
 const getAllTweets = asyncHandler(async (req, res) => {
   const allTweets = await Tweet.aggregate([
-    // sort by latest
+    //sort by latest
     {
       $sort: {
         createdAt: -1,
       },
     },
-    // fetch likes of tweet
+    //fetch likes of tweet
     {
       $lookup: {
         from: "likes",
@@ -224,7 +224,7 @@ const getAllTweets = asyncHandler(async (req, res) => {
         ],
       },
     },
-    // Reshape Likes and dislikes
+    //Reshape Likes and dislikes
     {
       $addFields: {
         likes: {
