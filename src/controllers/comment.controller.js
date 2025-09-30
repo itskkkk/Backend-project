@@ -1,84 +1,216 @@
 import mongoose, { isValidObjectId } from "mongoose";
 import {Comment} from "../models/comment.model.js";
-import {ApiError} from "../utilis/ApiError.js"
+import { Video } from "../models/video.model.js";
+import { Like }  from "../models/like.model.js";
+import {ApiError} from "../utilis/ApiError.js";
 import  {ApiResponse}    from "../utilis/ApiResponse.js";
 import {asyncHandler}  from "../utilis/asyncHandler.js";
 
 
-const getVideoComments = asyncHandler(async(req, res) => {
-    const {videoId} = req.params
-    const {page = 1, limit = 10, sortBy = "createdAt", order = "desc"} = req.query
-    //Todo: get all comments for a video
+const getVideoComments = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  const { page = 1, limit = 10 } = req.query;
 
-    if(!videoId || !isValidObjectId(videoId)){
-        throw new ApiError(400,"invalid videoId")
-    }
+  if (!isValidObjectId(videoId)) throw new ApiError(400, "Invalid VideoId");
 
-    const pageNumber = parseInt(page,10)
-    const pageLimit  = parseInt(limit,10)
+  const options = {
+    page,
+    limit,
+  };
 
-    const videoComments = await Comment.aggregate([
-        {
-            $match : {
-                video : new mongoose.Types.ObjectId(videoId)
-            }
+  const video = await Video.findById(videoId);
+
+  const allComments = await Comment.aggregate([
+    {
+      $match: {
+        video: new mongoose.Types.ObjectId(videoId),
+      },
+    },
+    // sort by date
+    {
+      $sort: {
+        createdAt: -1,
+      },
+    },
+    // fetch likes of Comment
+    {
+      $lookup: {
+        from: "likes",
+        localField: "_id",
+        foreignField: "comment",
+        as: "likes",
+        pipeline: [
+          {
+            $match: {
+              liked: true,
+            },
+          },
+          {
+            $group: {
+              _id: "liked",
+              owners: { $push: "$likedBy" },
+            },
+          },
+        ],
+      },
+    },
+    {
+      $lookup: {
+        from: "likes",
+        localField: "_id",
+        foreignField: "comment",
+        as: "dislikes",
+        pipeline: [
+          {
+            $match: {
+              liked: false,
+            },
+          },
+          {
+            $group: {
+              _id: "liked",
+              owners: { $push: "$likedBy" },
+            },
+          },
+        ],
+      },
+    },
+    // Reshape Likes and dislikes
+    {
+      $addFields: {
+        likes: {
+          $cond: {
+            if: {
+              $gt: [{ $size: "$likes" }, 0],
+            },
+            then: { $first: "$likes.owners" },
+            else: [],
+          },
         },
-        {
-            $lookup : {
-                from : "users",
-                localField : "owner",
-                foreignField : "_id",
-                as : "owner",
-                pipeline : [
-                    {
-                        $project : {
-                            username : 1,
-                            fullName : 1,
-                            avatar : 1,
-                        }
-                    }
-                ]
-            }
+        dislikes: {
+          $cond: {
+            if: {
+              $gt: [{ $size: "$dislikes" }, 0],
+            },
+            then: { $first: "$dislikes.owners" },
+            else: [],
+          },
         },
-        {
-            $addFields : {
-                owner : { $first : "$owner"}
-            }
+      },
+    },
+    // get owner details
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+        pipeline: [
+          {
+            $project: {
+              fullName: 1,
+              username: 1,
+              avatar: 1,
+              _id: 1,
+            },
+          },
+        ],
+      },
+    },
+    { $unwind: "$owner" },
+    {
+      $project: {
+        content: 1,
+        owner: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        isOwner: {
+          $cond: {
+            if: { $eq: [req.user?._id, "$owner._id"] },
+            then: true,
+            else: false,
+          },
         },
-        {
-            $sort : { [sortBy] : order === "asc" ? 1 : -1 }
+        likesCount: {
+          $size: "$likes",
         },
-        {
-            $skip : (pageNumber-1)*pageLimit
+        disLikesCount: {
+          $size: "$dislikes",
         },
-        {
-            $limit : pageLimit
-        }
-    ])
+        isLiked: {
+          $cond: {
+            if: {
+              $in: [req.user?._id, "$likes"],
+            },
+            then: true,
+            else: false,
+          },
+        },
+        isDisLiked: {
+          $cond: {
+            if: {
+              $in: [req.user?._id, "$dislikes"],
+            },
+            then: true,
+            else: false,
+          },
+        },
+        isLikedByVideoOwner: {
+          $cond: {
+            if: {
+              $in: [video.owner, "$likes"],
+            },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+  ]);
 
-    if(!videoComments){
-        throw new ApiError(400,"error while fetching comments")
-    }
+  return res
+    .status(200)
+    .json(new ApiResponse(200, allComments, "All comments Sent"));
 
-    const totalComments = await Comment.countDocuments({ video : new mongoose.Types.ObjectId(videoId) })
+  // TODO: Send paginated comments
 
-    return res.status(200)
-              .json(new ApiResponse(
-                200,
-                {
-                    videoComments,
-                    pagination : {
-                        totalComments,
-                        page : pageNumber,
-                        limit : pageLimit,
-                        totalPages : Math.ceil(totalComments/pageLimit)
-                    }
-                },
-                "comments fetched successfully"
-              ))
+  Comment.aggregatePaginate(allComments, options, function (err, results) {
+    console.log("results", results);
+    if (!err) {
+      const {
+        docs,
+        totalDocs,
+        limit,
+        page,
+        totalPages,
+        pagingCounter,
+        hasPrevPage,
+        hasNextPage,
+        prevPage,
+        nextPage,
+      } = results;
 
-
-})
+      return res.status(200).json(
+        new ApiResponse(
+          200,
+          {
+            Comments: docs,
+            totalDocs,
+            limit,
+            page,
+            totalPages,
+            pagingCounter,
+            hasPrevPage,
+            hasNextPage,
+            prevPage,
+            nextPage,
+          },
+          "Comments fetched successfully"
+        )
+      );
+    } else throw new ApiError(500, err.message);
+  });
+});
 
 const addComment = asyncHandler(async(req, res) => {
      //Todo: add a comment to a video
@@ -159,6 +291,10 @@ const deleteComment = asyncHandler(async(req, res) => {
     }
 
     await comment.deleteOne()
+
+    const deleteLikes = await Like.deleteMany({
+        comment: new mongoose.Types.ObjectId(commentId),
+    })
 
     return res.status(200)
               .json(new ApiResponse(200,null,"comment deleted successfully"))
