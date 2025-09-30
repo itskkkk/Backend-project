@@ -5,7 +5,7 @@ import cors from "cors";
 const app = express()
 
 app.use(cors({
-    origin: process.env.CORS_ORIGIN,
+    origin: ["https://tube-tweet-kohl.vercel.app","http://localhost:5173"],
     credentials: true 
 }))
 
