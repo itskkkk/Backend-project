@@ -113,7 +113,7 @@ const loginUser = asyncHandler(async (req, res) => {
 
     const {email, username, password} = req.body
 
-    if(!username && !email) {
+    if((!username && !email) || !password) {
         throw new ApiError(400, "username or email is required")
     }
 
@@ -135,14 +135,16 @@ const loginUser = asyncHandler(async (req, res) => {
 
     const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
 
-    const options = {
-        httpOnly: true,
-        secure: true
-    }
+    // const options = {
+    //     httpOnly: true,
+    //     secure: true
+    // }
+    res.setHeader(
+        "Set-Cookie",
+        `accessToken=${accessToken}; Max-Age=${1*24*60*60*1000}; Path=/; HttpOnly; SameSite=None; Secure; Partitioned`
+    );
 
     return res.status(200)
-               .cookie("accessToken", accessToken, options)
-               .cookie("refreshToken", refreshToken ,options)
                .json(
                   new ApiResponse(
                      200,
@@ -167,14 +169,17 @@ const logoutUser = asyncHandler(async(req, res) => {
          }
     )
 
-    const options = {
-        httpOnly: true,
-        secure: true
-    }
+    // const options = {
+    //     httpOnly: true,
+    //     secure: true,
+    //     sameSite: "None",
+    // }
+    res.setHeader(
+        "Set-Cookie",
+        `accessToken=; Max-Age=-1; Path=/; HttpOnly; SameSite=None; Secure; Partitioned`
+    )
 
     return res.status(200)
-              .clearCookie("accessToken",options)
-              .clearCookie("refreshToken",options)
               .json(new ApiResponse(200, {}, "User logged out"))
 })
 
@@ -201,16 +206,21 @@ const refreshAccessToken = asyncHandler (async (req, res) => {
             throw new ApiError(401, "Refresh token is expired or used")
         }
     
-        const options = {
-            httpOnly : true,
-            secure: true
-        }
+        // const options = {
+        //     httpOnly : true,
+        //     secure: true,
+        //     sameSite: "None",
+        //     Partitioned: true,
+        // };
     
         const {accessToken, newRefreshToken} = await generateAccessAndRefreshTokens(user._id)
     
+        res.setHeader(
+            "Set-Cookie",
+            `accessToken=${accessToken}; Max-Age=${1*24*60*60*1000}; Path=/; HttpOnly; SameSite=None; Secure; Partitioned`
+        );
+
         return res.status(200)
-                  .cookie("accessToken",accessToken,options)
-                  .cookie("refreshToken",newRefreshToken,options)
                   .json(
                       new ApiResponse(
                         200,
